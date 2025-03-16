@@ -1,0 +1,15 @@
+[package]
+name = "sf-bullet-train"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bullet = { git = "https://github.com/jw1912/bullet", package = "bullet_lib" }
+bulletformat = "1.7.0"
+sfbinpack = { package = "binpack", git = "https://github.com/Disservin/binpack-rust", rev = "483e9aac028b4c3e0671af6b28ff50f64d696558", features = ["bmi2"]}
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
