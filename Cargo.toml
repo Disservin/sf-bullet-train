@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+#bullet = { git = "https://github.com/jw1912/bullet", package = "bullet_lib", default-features = false, features = ["cpu"] }
 bullet = { git = "https://github.com/jw1912/bullet", package = "bullet_lib" }
 bulletformat = "1.7.0"
 sfbinpack = { package = "binpack", git = "https://github.com/Disservin/binpack-rust", rev = "483e9aac028b4c3e0671af6b28ff50f64d696558"}

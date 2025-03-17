@@ -32,7 +32,9 @@ impl OutputBuckets<ChessBoard> for SfMaterialCount {
 }
 
 type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
-const HL_SIZE: usize = 3072;
+const L1: usize = 3072;
+const L2: usize = 15;
+const L3: usize = 32;
 
 fn main() {
     #[rustfmt::skip]
@@ -52,7 +54,7 @@ fn main() {
     let max_active = <InputFeatures as inputs::SparseInputType>::max_active(&inputs);
     let num_buckets = <SfMaterialCount as outputs::OutputBuckets<_>>::BUCKETS;
 
-    let (graph, output_node) = build_network(num_inputs, max_active, num_buckets, HL_SIZE);
+    let (graph, output_node) = build_network(num_inputs, max_active, num_buckets);
 
     let mut trainer = Trainer::<RangerOptimiser, _, _>::new(
         graph,
@@ -61,15 +63,19 @@ fn main() {
         inputs,
         output_buckets,
         vec![
-            SavedFormat::new("pst", QuantTarget::I16(255), Layout::Normal),
-            SavedFormat::new("l0w", QuantTarget::I16(255), Layout::Normal),
             SavedFormat::new("l0b", QuantTarget::I16(255), Layout::Normal),
-            SavedFormat::new("l1w", QuantTarget::I16(64), Layout::Normal),
-            SavedFormat::new("l1b", QuantTarget::I16(64 * 255), Layout::Normal),
-            SavedFormat::new("l2w", QuantTarget::Float, Layout::Normal),
-            SavedFormat::new("l2b", QuantTarget::Float, Layout::Normal),
-            SavedFormat::new("l3w", QuantTarget::Float, Layout::Normal),
-            SavedFormat::new("l3b", QuantTarget::Float, Layout::Normal),
+            SavedFormat::new("l0w", QuantTarget::I16(255), Layout::Normal),
+            //
+            SavedFormat::new("pst", QuantTarget::I32(255), Layout::Normal),
+            //
+            SavedFormat::new("l1b", QuantTarget::I32(64 * 127), Layout::Normal),
+            SavedFormat::new("l1w", QuantTarget::I8(64), Layout::Normal),
+            //
+            SavedFormat::new("l2b", QuantTarget::I32(64 * 127), Layout::Normal),
+            SavedFormat::new("l2w", QuantTarget::I8(64), Layout::Normal),
+            //
+            SavedFormat::new("l3b", QuantTarget::I32(16 * 600), Layout::Normal),
+            SavedFormat::new("l3w", QuantTarget::I8(600 * 16 / 127), Layout::Normal),
         ],
         false,
     );
@@ -123,12 +129,7 @@ fn main() {
     println!("Eval: {eval:.3}cp");
 }
 
-fn build_network(
-    num_inputs: usize,
-    max_active: usize,
-    num_buckets: usize,
-    hl: usize,
-) -> (Graph, Node) {
+fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (Graph, Node) {
     let builder = NetworkBuilder::default();
 
     // inputs
@@ -138,11 +139,11 @@ fn build_network(
     let buckets = builder.new_sparse_input("buckets", Shape::new(num_buckets, 1), 1);
 
     // trainable weights
-    let l0 = builder.new_affine("l0", num_inputs, hl);
-    let l1 = builder.new_affine("l1", hl, num_buckets * 16);
-    let l1_fact = builder.new_affine("l1_fact", hl, 16);
-    let l2 = builder.new_affine("l2", 30, num_buckets * 32);
-    let l3 = builder.new_affine("l3", 32, num_buckets);
+    let l0 = builder.new_affine("l0", num_inputs, L1);
+    let l1 = builder.new_affine("l1", L1, num_buckets * (L2 + 1));
+    let l1_fact = builder.new_affine("l1_fact", L1, L2 + 1);
+    let l2 = builder.new_affine("l2", L2 * 2, num_buckets * L3);
+    let l3 = builder.new_affine("l3", L3, num_buckets);
     let pst = builder.new_weights(
         "pst",
         Shape::new(num_buckets, num_inputs),
