@@ -37,7 +37,7 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 [[package]]
 name = "bullet_core"
 version = "0.1.0"
-source = "git+https://github.com/jw1912/bullet#7c9b7ec7d0bab99862bc50c369436c763a5d28ed"
+source = "git+https://github.com/jw1912/bullet?rev=4df194aaaec8c3aea92c9936a4a6c9c38f4966a3#4df194aaaec8c3aea92c9936a4a6c9c38f4966a3"
 dependencies = [
  "rand",
  "rand_distr",
@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "bullet_hip_backend"
 version = "0.1.0"
-source = "git+https://github.com/jw1912/bullet#7c9b7ec7d0bab99862bc50c369436c763a5d28ed"
+source = "git+https://github.com/jw1912/bullet?rev=4df194aaaec8c3aea92c9936a4a6c9c38f4966a3#4df194aaaec8c3aea92c9936a4a6c9c38f4966a3"
 dependencies = [
  "bullet_core",
  "cc",
@@ -55,7 +55,7 @@ dependencies = [
 [[package]]
 name = "bullet_lib"
 version = "1.0.0"
-source = "git+https://github.com/jw1912/bullet#7c9b7ec7d0bab99862bc50c369436c763a5d28ed"
+source = "git+https://github.com/jw1912/bullet?rev=4df194aaaec8c3aea92c9936a4a6c9c38f4966a3#4df194aaaec8c3aea92c9936a4a6c9c38f4966a3"
 dependencies = [
  "bullet_core",
  "bullet_hip_backend",
