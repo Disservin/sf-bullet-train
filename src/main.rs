@@ -85,10 +85,14 @@ fn main() {
     const kMaxWeight: f64 = model_quantized_one / kWeightScale;
 
     let saved_format = vec![
-        SavedFormat::new("l0b", QuantTarget::I16(255), Layout::Normal),
-        SavedFormat::new("l0w", QuantTarget::I16(255), Layout::Normal),
-        SavedFormat::new("pst", QuantTarget::I32(255), Layout::Normal),
-        SavedFormat::new("l1b", QuantTarget::I32(64 * 255), Layout::Normal).add_transform(
+        SavedFormat::new("l0b", QuantTarget::I16(model_quantized_one), Layout::Normal),
+        SavedFormat::new("l0w", QuantTarget::I16(model_quantized_one), Layout::Normal),
+        SavedFormat::new(
+            "pst",
+            QuantTarget::I32(model_nnue2score * model_weight_scale_out),
+            Layout::Normal,
+        ),
+        SavedFormat::new("l1b", QuantTarget::I32(kBiasScaleHidden), Layout::Normal).add_transform(
             |graph, mut weights| {
                 let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
                 add_factoriser(&mut weights, &fact, L2 + 1);
@@ -97,7 +101,7 @@ fn main() {
         ),
         SavedFormat::new(
             "l1w",
-            QuantTarget::I8(64),
+            QuantTarget::I8(kWeightScaleHidden as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS * (L2 + 1), L1)),
         )
         .add_transform(|graph, mut weights| {
@@ -106,16 +110,16 @@ fn main() {
             add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
             weights
         }),
-        SavedFormat::new("l2b", QuantTarget::I32(64 * 127), Layout::Normal),
+        SavedFormat::new("l2b", QuantTarget::I32(kBiasScaleHidden), Layout::Normal),
         SavedFormat::new(
             "l2w",
-            QuantTarget::I8(64),
+            QuantTarget::I8(kWeightScaleHidden as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS * L3, L2 * 2)),
         ),
-        SavedFormat::new("l3b", QuantTarget::I32(16 * 600), Layout::Normal),
+        SavedFormat::new("l3b", QuantTarget::I32(kBiasScaleOut), Layout::Normal),
         SavedFormat::new(
             "l3w",
-            QuantTarget::I8(kWeightScale as i16),
+            QuantTarget::I8(kWeightScaleOut as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS, L3)),
         ),
     ];
@@ -136,7 +140,7 @@ fn main() {
 
     let schedule = TrainingSchedule {
         net_id: "test".to_string(),
-        eval_scale: 400.0,
+        eval_scale: model_nnue2score,
         steps: TrainingSteps {
             batch_size: 16_384,
             batches_per_superbatch: 1024,
