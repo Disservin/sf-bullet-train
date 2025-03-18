@@ -72,7 +72,7 @@ def read_binary_file(filename, L1, L2, L3, inputs, num_buckets=8):
         
         # Read pst (32-bit) - 720896 values (inputs * 8)
         data['pst'] = list(struct.unpack('<' + 'i' * (inputs * num_buckets), f.read(inputs * num_buckets * 4)))
-        
+
         # Read l1b (32-bit) - 128 values ((L2 + 1) * 8)
         data['l1b'] = list(struct.unpack('<' + 'i' * ((L2 + 1) * num_buckets), f.read((L2 + 1) * num_buckets * 4)))
         
@@ -102,7 +102,7 @@ def organize_into_buckets(data, L1, L2, L3, num_buckets=8):
         'l2': [],
         'l3': []
     }
-    
+
     # Organize l1 layer (bias and weights) into buckets
     for bucket in range(num_buckets):
         bias_start = bucket * (L2 + 1)
@@ -198,7 +198,7 @@ def convert_binary_format(input_file, output_file, L1=3072, L2=15, L3=32, inputs
             outfile.write(struct.pack('<' + 'b' * len(bucketed_data['l1'][bucket]['weights']), 
                                      *bucketed_data['l1'][bucket]['weights']))
             
-            start_position = outfile.tell()
+            # start_position = outfile.tell()
             
             assert len(bucketed_data['l2'][bucket]['bias']) == L3
             assert len(bucketed_data['l2'][bucket]['weights']) == (L2 + 1) * 2 * L3 
@@ -208,11 +208,10 @@ def convert_binary_format(input_file, output_file, L1=3072, L2=15, L3=32, inputs
             outfile.write(struct.pack('<' + 'b' * len(bucketed_data['l2'][bucket]['weights']), 
                                      *bucketed_data['l2'][bucket]['weights']))
             
-            end_position = outfile.tell()
-            bucket_size = end_position - start_position
-
-            print(f"Ending position for bucket {bucket}: {end_position}")
-            print(f"Bucket {bucket} size: {bucket_size} bytes")
+            # end_position = outfile.tell()
+            # bucket_size = end_position - start_position
+            # print(f"Ending position for bucket {bucket}: {end_position}")
+            # print(f"Bucket {bucket} size: {bucket_size} bytes")
 
             assert len(bucketed_data['l3'][bucket]['bias']) == 1
             assert len(bucketed_data['l3'][bucket]['weights']) == L3
