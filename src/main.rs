@@ -56,6 +56,34 @@ fn main() {
 
     let (graph, output_node) = build_network(num_inputs, max_active, num_buckets);
 
+    /*
+    self.nnue2score = 600.0
+    self.weight_scale_hidden = 64.0
+    self.weight_scale_out = 16.0
+    self.quantized_one = 127.0
+
+    kWeightScaleHidden = model.weight_scale_hidden
+    kWeightScaleOut = model.nnue2score * model.weight_scale_out / model.quantized_one
+    kWeightScale = kWeightScaleOut if is_output else kWeightScaleHidden
+    kBiasScaleOut = model.weight_scale_out * model.nnue2score
+    kBiasScaleHidden = model.weight_scale_hidden * model.quantized_one
+    kBiasScale = kBiasScaleOut if is_output else kBiasScaleHidden
+    kMaxWeight = model.quantized_one / kWeightScale
+     */
+
+    const model_nnue2score: f64 = 600.0;
+    const model_weight_scale_hidden: f64 = 64.0;
+    const model_weight_scale_out: f64 = 16.0;
+    const model_quantized_one: f64 = 127.0;
+
+    const kWeightScaleHidden: f64 = model_weight_scale_hidden;
+    const kWeightScaleOut: f64 = model_nnue2score * model_weight_scale_out / model_quantized_one;
+    const kWeightScale: f64 = kWeightScaleOut;
+    const kBiasScaleOut: f64 = model_weight_scale_out * model_nnue2score;
+    const kBiasScaleHidden: f64 = model_weight_scale_hidden * model_quantized_one;
+    const kBiasScale: f64 = kBiasScaleOut;
+    const kMaxWeight: f64 = model_quantized_one / kWeightScale;
+
     let saved_format = vec![
         SavedFormat::new("l0b", QuantTarget::I16(255), Layout::Normal),
         SavedFormat::new("l0w", QuantTarget::I16(255), Layout::Normal),
@@ -87,7 +115,7 @@ fn main() {
         SavedFormat::new("l3b", QuantTarget::I32(16 * 600), Layout::Normal),
         SavedFormat::new(
             "l3w",
-            QuantTarget::I8(600 * 16 / 127),
+            QuantTarget::I8(kWeightScale as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS, L3)),
         ),
     ];
@@ -113,7 +141,7 @@ fn main() {
             batch_size: 16_384,
             batches_per_superbatch: 1024,
             start_superbatch: 1,
-            end_superbatch: 1,
+            end_superbatch: 800,
         },
         wdl_scheduler: wdl::ConstantWDL { value: 0.0 },
         lr_scheduler: lr::StepLR {
@@ -121,7 +149,7 @@ fn main() {
             gamma: 0.3,
             step: 60,
         },
-        save_rate: 150,
+        save_rate: 50,
     };
 
     let settings = LocalSettings {
@@ -146,8 +174,13 @@ fn main() {
         loader::SfBinpackLoader::new(file_path, buffer_size_mb, threads, filter)
     };
     //trainer.profile_all_nodes();
-    trainer.run(&schedule, &settings, &data_loader);
+    // trainer.run(&schedule, &settings, &data_loader);
     //trainer.report_profiles();
+
+    trainer.load_from_checkpoint("./checkpoints/test-800");
+
+    trainer.save_quantised("./checkpoints/test-800/quantised_new.bin");
+
     let eval =
         400.0 * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0");
     println!("Eval: {eval:.3}cp");
