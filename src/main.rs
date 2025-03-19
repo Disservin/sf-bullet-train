@@ -211,25 +211,24 @@ fn main() {
     };
 
     //trainer.profile_all_nodes();
-    trainer.run(&schedule, &settings, &data_loader);
+    // trainer.run(&schedule, &settings, &data_loader);
     //trainer.report_profiles();
 
-    // trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-1");
+    trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-80");
 
-    // trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
+    // trainer.save_quantised("./checkpoints/halfkav2_hm/test-90/quantised.bin");
 
-    let eval = model_nnue2score as f32
-        * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0");
+    let fens = [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0",
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1 | 0 | 0.0",
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1 | 0 | 0.0",
+        "r1br2k1/2q1bpp1/p1npP3/1ppn2p1/4P3/P2P4/BPP3PP/R1BQ1R1K w - - 0 15",
+    ];
 
-    println!("Eval: {eval:.3}cp");
-
-    let eval = model_nnue2score as f32
-        * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1 | 0 | 0.0");
-    println!("Eval: {eval:.3}cp");
-
-    let eval = model_nnue2score as f32
-        * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1 | 0 | 0.0");
-    println!("Eval: {eval:.3}cp");
+    for fen in fens.iter() {
+        let eval = model_nnue2score as f32 * trainer.eval(fen);
+        println!("Eval: {eval:.3}cp");
+    }
 }
 
 fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (Graph, Node) {
@@ -346,4 +345,16 @@ fn initialize_weights(graph: &mut Graph, num_inputs: usize) {
         .get_weights_mut("pst")
         .load_from_slice(None, &values)
         .unwrap();
+}
+
+fn test_fens() {
+    let fens = [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1",
+    ];
+
+    for fen in fens.iter() {
+        println!("FEN: {}", fen);
+    }
 }
