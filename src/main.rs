@@ -80,20 +80,6 @@ fn main() {
     let (mut graph, output_node) = build_network(num_inputs, max_active, num_buckets);
 
     initialize_weights(&mut graph, num_inputs);
-    /*
-    self.nnue2score = 600.0
-    self.weight_scale_hidden = 64.0
-    self.weight_scale_out = 16.0
-    self.quantized_one = 127.0
-
-    kWeightScaleHidden = model.weight_scale_hidden
-    kWeightScaleOut = model.nnue2score * model.weight_scale_out / model.quantized_one
-    kWeightScale = kWeightScaleOut if is_output else kWeightScaleHidden
-    kBiasScaleOut = model.weight_scale_out * model.nnue2score
-    kBiasScaleHidden = model.weight_scale_hidden * model.quantized_one
-    kBiasScale = kBiasScaleOut if is_output else kBiasScaleHidden
-    kMaxWeight = model.quantized_one / kWeightScale
-     */
 
     let saved_format = vec![
         SavedFormat::new(
@@ -225,12 +211,12 @@ fn main() {
     };
 
     //trainer.profile_all_nodes();
-    // trainer.run(&schedule, &settings, &data_loader);
+    trainer.run(&schedule, &settings, &data_loader);
     //trainer.report_profiles();
 
     // trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-1");
 
-    trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
+    // trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
 
     let eval = model_nnue2score as f32
         * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0");
@@ -328,37 +314,36 @@ fn halfka_psqts() -> Vec<f32> {
         (QUEEN, 2538.0),
     ];
 
-    let mut values = vec![0 as f32; NUM_INPUTS];
+    let mut values = vec![0 as f32; NUM_INPUTS * 8];
 
     for ksq in 0..64 {
         for s in 0..64 {
             for &(pt, val) in &piece_values {
                 let idxw = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8);
                 let idxb = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8 + 8);
-                values[idxw] = -val;
-                values[idxb] = val;
+                for bucket in 0..8 {
+                    values[idxw * 8 + bucket] = -val;
+                    values[idxb * 8 + bucket] = val;
+                }
             }
         }
     }
 
     values
 }
+
 fn initialize_weights(graph: &mut Graph, num_inputs: usize) {
-    let mut original = halfka_psqts();
+    let mut values = halfka_psqts();
 
     // let virtual_values = vec![0.0; NUM_PLANES_VIRTUAL];
     // original.extend_from_slice(&virtual_values);
-
-    let mut values = original.repeat(8);
 
     for i in 0..values.len() {
         values[i] *= 1.0 / model_nnue2score as f32;
     }
 
-    let weights = graph.get_weights("pst").values.batch_size();
-
     graph
         .get_weights_mut("pst")
-        .load_from_slice(weights, &values)
+        .load_from_slice(None, &values)
         .unwrap();
 }
