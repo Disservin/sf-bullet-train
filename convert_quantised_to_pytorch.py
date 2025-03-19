@@ -72,7 +72,7 @@ def read_binary_file(filename, L1, L2, L3, inputs, num_buckets=8):
         
         # Read pst (32-bit) - 720896 values (inputs * 8)
         data['pst'] = list(struct.unpack('<' + 'i' * (inputs * num_buckets), f.read(inputs * num_buckets * 4)))
-
+        print(data['pst'])
         # Read l1b (32-bit) - 128 values ((L2 + 1) * 8)
         data['l1b'] = list(struct.unpack('<' + 'i' * ((L2 + 1) * num_buckets), f.read((L2 + 1) * num_buckets * 4)))
         
@@ -102,6 +102,17 @@ def organize_into_buckets(data, L1, L2, L3, num_buckets=8):
         'l2': [],
         'l3': []
     }
+
+    total_elements = len(data['pst'])
+    num_indices = total_elements // num_buckets
+    restructured_pst = []
+    
+    for idx in range(num_indices):
+        for bucket in range(num_buckets):
+            original_position = bucket * num_indices + idx
+            restructured_pst.append(data['pst'][original_position])
+        
+    bucketed_data['pst'] = restructured_pst
 
     # Organize l1 layer (bias and weights) into buckets
     for bucket in range(num_buckets):

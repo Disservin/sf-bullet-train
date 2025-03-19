@@ -37,7 +37,7 @@ impl OutputBuckets<ChessBoard> for SfMaterialCount {
 
 // type InputFeatures = Factorised<HalfKAv2_hm, Chess768>;
 // type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
-type InputFeatures = inputs::ChessBucketsMergedKingsMirrored;
+type InputFeatures = HalfKAv2_hm;
 const L1: usize = 3072;
 const L2: usize = 15;
 const L3: usize = 32;
@@ -225,12 +225,12 @@ fn main() {
     };
 
     //trainer.profile_all_nodes();
-    trainer.run(&schedule, &settings, &data_loader);
+    // trainer.run(&schedule, &settings, &data_loader);
     //trainer.report_profiles();
 
     // trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-1");
 
-    // trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
+    trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
 
     let eval = model_nnue2score as f32
         * trainer.eval("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0");
