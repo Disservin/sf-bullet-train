@@ -30,9 +30,17 @@ impl HalfKAv2_hm {
         -1, -1, -1, -1, 3, 2, 1, 0
     ];
 
+    pub fn num_inputs(&self) -> usize {
+        HalfKAv2_hm::INPUTS
+    }
+
+    pub fn max_active(&self) -> usize {
+        HalfKAv2_hm::MAX_ACTIVE_FEATURES
+    }
+
     // Direct translation of orient_flip_2 from C++
-    fn orient_flip_2(color: bool, sq: u8, ksq: u8) -> u8 {
-        let h = ksq % 8 < 4;
+    const fn orient_flip_2(color: bool, sq: u8, ksq: u8) -> u8 {
+        let h = ksq & 7 < 4;
         let mut result = sq;
 
         if color {
@@ -49,7 +57,7 @@ impl HalfKAv2_hm {
     }
 
     // Direct translation of feature_index from C++
-    pub fn feature_index(color: bool, ksq: u8, sq: u8, piece: u8) -> usize {
+    pub const fn feature_index(color: bool, ksq: u8, sq: u8, piece: u8) -> usize {
         let o_ksq = Self::orient_flip_2(color, ksq, ksq);
 
         // Calculate piece index
@@ -59,8 +67,8 @@ impl HalfKAv2_hm {
         let mut p_idx = (piece_type * 2 + if piece_color != color { 1 } else { 0 }) as usize;
 
         // Pack the opposite king
-        if p_idx == 13 {
-            p_idx = 12;
+        if p_idx == 11 {
+            p_idx = 10;
         }
 
         // Get king bucket
@@ -75,6 +83,9 @@ impl HalfKAv2_hm {
     }
 }
 
+const _: () = assert!(HalfKAv2_hm::feature_index(false, 0, 0, 5) == 20359);
+const _: () = assert!(HalfKAv2_hm::feature_index(true, 0, 0, 5) == 703);
+
 impl SparseInputType for HalfKAv2_hm {
     type RequiredDataType = ChessBoard;
 
@@ -88,13 +99,8 @@ impl SparseInputType for HalfKAv2_hm {
 
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, mut f: F) {
         for (piece, square) in pos.into_iter() {
-            let c = usize::from(piece & 8 > 0) != 0;
-
-            // Calculate feature from our perspective
-            let our_feature = HalfKAv2_hm::feature_index(c, pos.our_ksq(), square, piece);
-
-            // Calculate feature from opponent's perspective
-            let opp_feature = HalfKAv2_hm::feature_index(!c, pos.opp_ksq(), square, piece);
+            let our_feature = HalfKAv2_hm::feature_index(false, pos.our_ksq(), square, piece);
+            let opp_feature = HalfKAv2_hm::feature_index(true, pos.opp_ksq(), square, piece);
 
             f(our_feature, opp_feature);
         }

@@ -36,7 +36,8 @@ impl OutputBuckets<ChessBoard> for SfMaterialCount {
 }
 
 // type InputFeatures = Factorised<HalfKAv2_hm, Chess768>;
-type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
+type InputFeatures = HalfKAv2_hm;
+// type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
 const L1: usize = 3072;
 const L2: usize = 15;
 const L3: usize = 32;
@@ -68,31 +69,19 @@ fn main() {
         28, 29, 30, 31,
     ];
 
-    let inputs = InputFeatures::new(buckets);
+    // let inputs = InputFeatures::new(buckets);
     // let inputs = Factorised::from_parts(HalfKAv2_hm::new(buckets), Chess768);
+    let inputs = HalfKAv2_hm::new(buckets);
 
     let output_buckets = SfMaterialCount::default();
-    let num_inputs = <InputFeatures as inputs::SparseInputType>::num_inputs(&inputs);
-    let max_active = <InputFeatures as inputs::SparseInputType>::max_active(&inputs);
+    let num_inputs = inputs.num_inputs();
+    let max_active = inputs.max_active();
     let num_buckets = <SfMaterialCount as outputs::OutputBuckets<_>>::BUCKETS;
 
     let (mut graph, output_node) = build_network(num_inputs, max_active, num_buckets);
 
+    // skip init weights for now
     initialize_weights(&mut graph, num_inputs);
-    /*
-    self.nnue2score = 600.0
-    self.weight_scale_hidden = 64.0
-    self.weight_scale_out = 16.0
-    self.quantized_one = 127.0
-
-    kWeightScaleHidden = model.weight_scale_hidden
-    kWeightScaleOut = model.nnue2score * model.weight_scale_out / model.quantized_one
-    kWeightScale = kWeightScaleOut if is_output else kWeightScaleHidden
-    kBiasScaleOut = model.weight_scale_out * model.nnue2score
-    kBiasScaleHidden = model.weight_scale_hidden * model.quantized_one
-    kBiasScale = kBiasScaleOut if is_output else kBiasScaleHidden
-    kMaxWeight = model.quantized_one / kWeightScale
-     */
 
     let saved_format = vec![
         SavedFormat::new(
@@ -112,8 +101,8 @@ fn main() {
         ),
         SavedFormat::new("l1b", QuantTarget::I32(kBiasScaleHidden), Layout::Normal).add_transform(
             |graph, mut weights| {
-                let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
-                add_factoriser(&mut weights, &fact, L2 + 1);
+                // let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
+                // add_factoriser(&mut weights, &fact, L2 + 1);
                 weights
             },
         ),
@@ -123,9 +112,9 @@ fn main() {
             Layout::Transposed(Shape::new(NUM_BUCKETS * (L2 + 1), L1)),
         )
         .add_transform(|graph, mut weights| {
-            let fact = graph.get_weights("l1_factw").get_dense_vals().unwrap();
-            let fact = SavedFormat::transpose(Shape::new(L2 + 1, L1), &fact);
-            add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
+            // let fact = graph.get_weights("l1_factw").get_dense_vals().unwrap();
+            // let fact = SavedFormat::transpose(Shape::new(L2 + 1, L1), &fact);
+            // add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
 
             for i in 0..weights.len() {
                 weights[i] = weights[i].clamp(-kMaxWeightHidden, kMaxWeightHidden);
@@ -179,7 +168,7 @@ fn main() {
         },
     );
 
-    trainer.mark_weights_as_input_factorised(&["l0w", "pst"]);
+    // trainer.mark_weights_as_input_factorised(&["l0w", "pst"]);
 
     println!("Params: {}", trainer.optimiser().graph.get_num_params());
 
@@ -190,7 +179,7 @@ fn main() {
             batch_size: 16_384,
             batches_per_superbatch: 1024,
             start_superbatch: 1,
-            end_superbatch: 5,
+            end_superbatch: 1,
         },
         wdl_scheduler: wdl::ConstantWDL { value: 0.0 },
         lr_scheduler: lr::StepLR {
@@ -224,10 +213,10 @@ fn main() {
     };
 
     //trainer.profile_all_nodes();
-    trainer.run(&schedule, &settings, &data_loader);
+    // trainer.run(&schedule, &settings, &data_loader);
     //trainer.report_profiles();
 
-    // trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-1");
+    trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-1");
 
     // trainer.save_quantised("./checkpoints/halfkav2_hm/test-1/quantised.bin");
 
@@ -257,7 +246,7 @@ fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (G
     // trainable weights
     let l0 = builder.new_affine("l0", num_inputs, L1);
     let l1 = builder.new_affine("l1", L1, num_buckets * (L2 + 1));
-    let l1_fact = builder.new_affine("l1_fact", L1, L2 + 1);
+    // let l1_fact = builder.new_affine("l1_fact", L1, L2 + 1);
     let l2 = builder.new_affine("l2", L2 * 2, num_buckets * L3);
     let l3 = builder.new_affine("l3", L3, num_buckets);
     let pst = builder.new_weights(
@@ -272,7 +261,8 @@ fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (G
     let mut out = stm_subnet.concat(ntm_subnet);
 
     out = out.pairwise_mul_post_affine_dual();
-    out = l1.forward(out).select(buckets) + l1_fact.forward(out);
+    // out = l1.forward(out).select(buckets) + l1_fact.forward(out);
+    out = l1.forward(out).select(buckets);
 
     let skip_neuron = out.slice_rows(15, 16);
     out = out.slice_rows(0, 15);
@@ -333,19 +323,22 @@ fn halfka_psqts() -> Vec<f32> {
             for &(pt, val) in &piece_values {
                 let idxw = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8);
                 let idxb = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8 + 8);
-                values[idxw] = val;
-                values[idxb] = -val;
+                // idk rn why this has to be reversed but it only gives "correct" values when init this way
+                // tested by loading the pst into sf and checking the material values
+                values[idxw] = -val;
+                values[idxb] = val;
             }
         }
     }
 
     values
 }
+
 fn initialize_weights(graph: &mut Graph, num_inputs: usize) {
     let mut original = halfka_psqts();
 
-    let virtual_values = vec![0.0; NUM_PLANES_VIRTUAL];
-    original.extend_from_slice(&virtual_values);
+    // let virtual_values = vec![0.0; NUM_PLANES_VIRTUAL];
+    // original.extend_from_slice(&virtual_values);
 
     let mut values = original.repeat(8);
 
