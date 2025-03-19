@@ -91,10 +91,10 @@ impl SparseInputType for HalfKAv2_hm {
             let c = usize::from(piece & 8 > 0) != 0;
 
             // Calculate feature from our perspective
-            let our_feature = HalfKAv2_hm::feature_index(c, pos.our_ksq(), square, piece);
+            let our_feature = HalfKAv2_hm::feature_index(false, pos.our_ksq(), square, piece);
 
             // Calculate feature from opponent's perspective
-            let opp_feature = HalfKAv2_hm::feature_index(!c, pos.opp_ksq(), square, piece);
+            let opp_feature = HalfKAv2_hm::feature_index(true, pos.opp_ksq(), square, piece);
 
             f(our_feature, opp_feature);
         }

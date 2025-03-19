@@ -36,7 +36,8 @@ impl OutputBuckets<ChessBoard> for SfMaterialCount {
 }
 
 // type InputFeatures = Factorised<HalfKAv2_hm, Chess768>;
-type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
+// type InputFeatures = inputs::ChessBucketsMergedKingsMirroredFactorised;
+type InputFeatures = inputs::ChessBucketsMergedKingsMirrored;
 const L1: usize = 3072;
 const L2: usize = 15;
 const L3: usize = 32;
@@ -112,8 +113,8 @@ fn main() {
         ),
         SavedFormat::new("l1b", QuantTarget::I32(kBiasScaleHidden), Layout::Normal).add_transform(
             |graph, mut weights| {
-                let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
-                add_factoriser(&mut weights, &fact, L2 + 1);
+                // let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
+                // add_factoriser(&mut weights, &fact, L2 + 1);
                 weights
             },
         ),
@@ -123,9 +124,9 @@ fn main() {
             Layout::Transposed(Shape::new(NUM_BUCKETS * (L2 + 1), L1)),
         )
         .add_transform(|graph, mut weights| {
-            let fact = graph.get_weights("l1_factw").get_dense_vals().unwrap();
-            let fact = SavedFormat::transpose(Shape::new(L2 + 1, L1), &fact);
-            add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
+            // let fact = graph.get_weights("l1_factw").get_dense_vals().unwrap();
+            // let fact = SavedFormat::transpose(Shape::new(L2 + 1, L1), &fact);
+            // add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
 
             for i in 0..weights.len() {
                 weights[i] = weights[i].clamp(-kMaxWeightHidden, kMaxWeightHidden);
@@ -179,7 +180,7 @@ fn main() {
         },
     );
 
-    trainer.mark_weights_as_input_factorised(&["l0w", "pst"]);
+    // trainer.mark_weights_as_input_factorised(&["l0w", "pst"]);
 
     println!("Params: {}", trainer.optimiser().graph.get_num_params());
 
@@ -257,7 +258,7 @@ fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (G
     // trainable weights
     let l0 = builder.new_affine("l0", num_inputs, L1);
     let l1 = builder.new_affine("l1", L1, num_buckets * (L2 + 1));
-    let l1_fact = builder.new_affine("l1_fact", L1, L2 + 1);
+    // let l1_fact = builder.new_affine("l1_fact", L1, L2 + 1);
     let l2 = builder.new_affine("l2", L2 * 2, num_buckets * L3);
     let l3 = builder.new_affine("l3", L3, num_buckets);
     let pst = builder.new_weights(
@@ -272,7 +273,8 @@ fn build_network(num_inputs: usize, max_active: usize, num_buckets: usize) -> (G
     let mut out = stm_subnet.concat(ntm_subnet);
 
     out = out.pairwise_mul_post_affine_dual();
-    out = l1.forward(out).select(buckets) + l1_fact.forward(out);
+    // out = l1.forward(out).select(buckets) + l1_fact.forward(out);
+    out = l1.forward(out).select(buckets);
 
     let skip_neuron = out.slice_rows(15, 16);
     out = out.slice_rows(0, 15);
@@ -333,8 +335,8 @@ fn halfka_psqts() -> Vec<f32> {
             for &(pt, val) in &piece_values {
                 let idxw = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8);
                 let idxb = HalfKAv2_hm::feature_index(true, ksq as u8, s as u8, pt as u8 + 8);
-                values[idxw] = val;
-                values[idxb] = -val;
+                values[idxw] = -val;
+                values[idxb] = val;
             }
         }
     }
@@ -344,8 +346,8 @@ fn halfka_psqts() -> Vec<f32> {
 fn initialize_weights(graph: &mut Graph, num_inputs: usize) {
     let mut original = halfka_psqts();
 
-    let virtual_values = vec![0.0; NUM_PLANES_VIRTUAL];
-    original.extend_from_slice(&virtual_values);
+    // let virtual_values = vec![0.0; NUM_PLANES_VIRTUAL];
+    // original.extend_from_slice(&virtual_values);
 
     let mut values = original.repeat(8);
 
