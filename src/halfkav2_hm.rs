@@ -5,7 +5,7 @@ use bulletformat::ChessBoard;
 pub struct HalfKAv2_hm {}
 
 impl HalfKAv2_hm {
-    pub fn new(buckets: [usize; 32]) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 

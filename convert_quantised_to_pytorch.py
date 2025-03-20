@@ -66,10 +66,10 @@ def read_binary_file(filename, L1, L2, L3, inputs, num_buckets=8):
         
         # Read l0b (16-bit) - 3072 values
         data['l0b'] = list(struct.unpack('<' + 'h' * 3072, f.read(3072 * 2)))
-        
+
         # Read l0w (16-bit) - 69206016 values (inputs * L1)
         data['l0w'] = list(struct.unpack('<' + 'h' * (inputs * L1), f.read(inputs * L1 * 2)))
-        
+
         # Read pst (32-bit) - 720896 values (inputs * 8)
         data['pst'] = list(struct.unpack('<' + 'i' * (inputs * num_buckets), f.read(inputs * num_buckets * 4)))
 
@@ -82,8 +82,8 @@ def read_binary_file(filename, L1, L2, L3, inputs, num_buckets=8):
         # Read l2b (32-bit) - 256 values (L3 * 8)
         data['l2b'] = list(struct.unpack('<' + 'i' * (L3 * num_buckets), f.read(L3 * num_buckets * 4)))
         
-        # Read l2w (8-bit) - 7680 values (L2 * 2 * L3 * 8)
-        data['l2w'] = list(struct.unpack('<' + 'b' * (L2 * 2 * L3 * num_buckets), f.read(L2 * 2 * L3 * num_buckets)))
+        # Read l2w (8-bit) - 7680 values ((L2 + 1) * 2 * L3 * 8)
+        data['l2w'] = list(struct.unpack('<' + 'b' * ((L2 + 1) * 2 * L3 * num_buckets), f.read((L2+1) * 2 * L3 * num_buckets)))
         
         # Read l3b (32-bit) - 8 values (8)
         data['l3b'] = list(struct.unpack('<' + 'i' * num_buckets, f.read(num_buckets * 4)))
@@ -119,24 +119,16 @@ def organize_into_buckets(data, L1, L2, L3, num_buckets=8):
     for bucket in range(num_buckets):
         bias_start = bucket * L3
         bias_end = bias_start + L3
-        weights_start = bucket * L2 * 2 * L3
-        weights_end = weights_start + L2 * 2 * L3
+        weights_start = bucket * (L2 + 1) * 2 * L3
+        weights_end = weights_start + (L2 + 1) * 2 * L3
 
         weights = data['l2w'][weights_start:weights_end]
         
-        # EDIT: I think this needs to be aligned to 32 elements, so add two zeros after every L2*2 (30) elements
-        # Insert two zeros after every L2*2 (30) elements
-        modified_weights = []
-        for i in range(0, len(weights), L2 * 2):
-            chunk = weights[i:i + L2 * 2]
-            modified_weights.extend(chunk)
-            modified_weights.extend([0, 0])
-        
         bucketed_data['l2'].append({
             'bias': data['l2b'][bias_start:bias_end],
-            'weights': modified_weights
+            'weights': weights
         })
-    
+
     # Organize l3 layer (bias and weights) into buckets
     for bucket in range(num_buckets):
         bias_start = bucket

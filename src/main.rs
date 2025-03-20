@@ -49,27 +49,13 @@ const model_quantized_one: i32 = 127;
 
 const kWeightScaleHidden: i32 = model_weight_scale_hidden;
 const kWeightScaleOut: i32 = model_nnue2score * model_weight_scale_out / model_quantized_one;
-// const kWeightScale: i32 = kWeightScaleOut;
 const kBiasScaleOut: i32 = model_weight_scale_out * model_nnue2score;
 const kBiasScaleHidden: i32 = model_weight_scale_hidden * model_quantized_one;
-// const kBiasScale: i32 = kBiasScaleOut;
 const kMaxWeightOut: f32 = model_quantized_one as f32 / kWeightScaleOut as f32;
 const kMaxWeightHidden: f32 = model_quantized_one as f32 / kWeightScaleHidden as f32;
 
 fn main() {
-    #[rustfmt::skip]
-    let mut buckets = [
-        0, 1, 2, 3,
-        4, 5, 6, 7,
-        8, 9, 10, 11,
-        12, 13, 14, 15,
-        16, 17, 18, 19,
-        20, 21, 22, 23,
-        24, 25, 26, 27,
-        28, 29, 30, 31,
-    ];
-
-    let inputs = InputFeatures::new(buckets);
+    let inputs = InputFeatures::new();
     // let inputs = Factorised::from_parts(HalfKAv2_hm::new(buckets), Chess768);
 
     let output_buckets = SfMaterialCount::default();
@@ -98,7 +84,7 @@ fn main() {
             Layout::Normal,
         ),
         SavedFormat::new("l1b", QuantTarget::I32(kBiasScaleHidden), Layout::Normal).add_transform(
-            |graph, mut weights| {
+            |_, mut weights| {
                 // let fact = graph.get_weights("l1_factb").get_dense_vals().unwrap();
                 // add_factoriser(&mut weights, &fact, L2 + 1);
                 weights
@@ -109,7 +95,7 @@ fn main() {
             QuantTarget::I8(kWeightScaleHidden as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS * (L2 + 1), L1)),
         )
-        .add_transform(|graph, mut weights| {
+        .add_transform(|_, mut weights| {
             // let fact = graph.get_weights("l1_factw").get_dense_vals().unwrap();
             // let fact = SavedFormat::transpose(Shape::new(L2 + 1, L1), &fact);
             // add_factoriser(&mut weights, &fact, (L2 + 1) * L1);
@@ -126,10 +112,12 @@ fn main() {
             QuantTarget::I8(kWeightScaleHidden as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS * L3, L2 * 2)),
         )
-        .add_transform(|graph, mut weights| {
+        .add_transform(|_, mut weights| {
             for i in 0..weights.len() {
                 weights[i] = weights[i].clamp(-kMaxWeightHidden, kMaxWeightHidden);
             }
+
+            weights = pad_weights_to_32(weights, Shape::new(NUM_BUCKETS * L3, L2 * 2));
 
             weights
         }),
@@ -139,7 +127,7 @@ fn main() {
             QuantTarget::I8(kWeightScaleOut as i16),
             Layout::Transposed(Shape::new(NUM_BUCKETS, L3)),
         )
-        .add_transform(|graph, mut weights| {
+        .add_transform(|_, mut weights| {
             for i in 0..weights.len() {
                 weights[i] = weights[i].clamp(-kMaxWeightOut, kMaxWeightOut);
             }
@@ -216,13 +204,14 @@ fn main() {
 
     trainer.load_from_checkpoint("./checkpoints/halfkav2_hm/test-80");
 
-    // trainer.save_quantised("./checkpoints/halfkav2_hm/test-90/quantised.bin");
+    trainer.save_quantised("./checkpoints/halfkav2_hm/test-80/quantised.bin");
 
     let fens = [
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0 | 0.0",
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1 | 0 | 0.0",
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1 | 0 | 0.0",
         "r1br2k1/2q1bpp1/p1npP3/1ppn2p1/4P3/P2P4/BPP3PP/R1BQ1R1K w - - 0 15",
+        "r1b4k/2qb1Pp1/p1np4/1ppn2p1/4P3/P2P4/BPPQ2PP/R1B2R1K w - - 1 16",
     ];
 
     for fen in fens.iter() {
@@ -347,14 +336,23 @@ fn initialize_weights(graph: &mut Graph, num_inputs: usize) {
         .unwrap();
 }
 
-fn test_fens() {
-    let fens = [
-        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
-        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1",
-    ];
+fn pad_weights_to_32(weights: Vec<f32>, shape: Shape) -> Vec<f32> {
+    let rows = shape.rows();
+    let cols = shape.cols();
 
-    for fen in fens.iter() {
-        println!("FEN: {}", fen);
+    if cols % 32 == 0 {
+        return weights;
     }
+
+    let padded_cols = cols + (32 - (cols % 32));
+
+    let mut padded_weights = vec![0.0; rows * padded_cols];
+
+    for r in 0..rows {
+        for c in 0..cols {
+            padded_weights[r * padded_cols + c] = weights[r * cols + c];
+        }
+    }
+
+    padded_weights
 }
